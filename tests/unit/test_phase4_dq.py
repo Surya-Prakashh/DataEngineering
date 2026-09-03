@@ -10,15 +10,14 @@ Tests cover:
 """
 
 import hashlib
-import sqlite3
-
-import pytest
-
-# Import the DQ validator directly from phase4.py
-import sys
 import os
+import sqlite3
+import sys
+
+# Ensure project root is on path so phase4 can be imported directly
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from phase4 import validate_event_data_quality
+
+from phase4 import validate_event_data_quality  # noqa: E402
 
 
 # ─────────────────────────────────────────────────────────────────────────────

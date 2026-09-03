@@ -147,7 +147,7 @@ def run_end_to_end_pipeline():
     log(f"   ✓ Consumed {len(unread)} Kafka messages (Passed DQ: {passed_cnt}, Failed to DLQ: {failed_cnt})")
     log(f"   ✓ Staging DB count: {staging_total} rows (Idempotent UPSERT active)")
     log("   ✓ Atomic transaction boundary verified (ROLLBACK ready)")
-    
+
     p4_duration = round((time.time() - p4_start) * 1000, 2)
     log(f"✅ [Phase 4] Resilient Ingestion completed in {p4_duration} ms")
 
@@ -173,11 +173,11 @@ def api_add_mock_data():
     data = request.get_json() if request.is_json else {}
     count = int(data.get("count", 50))
     total_rows, added = add_mock_data_rows(count)
-    
+
     # Re-build physical databases
     create_physical_oltp_db()
     create_physical_olap_db()
-    
+
     return jsonify({
         "status": "SUCCESS",
         "added_rows": added,
@@ -191,7 +191,7 @@ def api_upload_csv():
     """Processes uploaded CSV file."""
     if "file" not in request.files:
         return jsonify({"status": "ERROR", "message": "No file uploaded"}), 400
-    
+
     file = request.files["file"]
     success, result = upload_custom_csv(file)
     if success:
@@ -215,7 +215,7 @@ def api_reset_dataset():
     return jsonify({
         "status": "SUCCESS",
         "total_rows": total,
-        "message": f"Dataset reset to original baseline 1643 rows."
+        "message": "Dataset reset to original baseline 1643 rows."
     })
 
 

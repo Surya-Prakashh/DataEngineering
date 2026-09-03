@@ -1,0 +1,24 @@
+[flake8]
+max-line-length = 120
+extend-ignore = E203, W503
+
+# ── Per-file ignores for pre-existing source files ───────────────────────────
+# These files existed before CI was introduced. Ignoring style issues that
+# would require a large unrelated refactor to fix.
+per-file-ignores =
+    phase1.py:    E302,E303,E305,E402,E501,W291,W293,F401,E221,E225,E261,E128
+    phase2.py:    E302,E303,E305,E402,E501,W291,W293,F401,E221,E225,E261,E128,F841
+    phase3.py:    E302,E303,E305,E402,E501,W291,W293,F401,E221,E225,E261,E128,E228
+    phase4.py:    E302,E303,E305,E402,E501,W291,W293,F401,E221,E225,E261,E128,F824,F841
+    app.py:       E302,E303,E305,E501,W291,W293,F401,E225
+    dataset_manager.py: E302,E303,E305,E501,W291,W293,F401,E221,E225,E228,E261,E231,F824
+    pipeline.py:  E302,E303,E305,E501,W291,W293,F401,E221,E225,E261
+
+exclude =
+    .git,
+    __pycache__,
+    venv,
+    .venv,
+    build,
+    dist,
+    *.egg-info

@@ -147,11 +147,12 @@ def seed_oltp_data(conn: sqlite3.Connection, n_scans: int = 10):
     base_time = datetime(2024, 1, 1, 10, 0, 0)
     for i in range(n_scans):
         ts = (base_time + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute(
-            "INSERT INTO scan_logs (sample_hash, device_id, family_id, scan_timestamp, shannon_entropy, file_size_bytes) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (f"hash_{i:04d}", "DEV-001", (i % 9) + 1, ts, 6.5 + i * 0.05, 500000 + i * 1000)
+        sql = (
+            "INSERT INTO scan_logs "
+            "(sample_hash, device_id, family_id, scan_timestamp, shannon_entropy, file_size_bytes) "
+            "VALUES (?, ?, ?, ?, ?, ?)"
         )
+        cursor.execute(sql, (f"hash_{i:04d}", "DEV-001", (i % 9) + 1, ts, 6.5 + i * 0.05, 500000 + i * 1000))
     conn.commit()
 
 
@@ -162,10 +163,12 @@ def seed_olap_data(conn: sqlite3.Connection):
     cursor.execute("INSERT INTO dim_device VALUES ('DEV-001', 'WKSTN-01', 'Windows 10', '192.168.1.10')")
     cursor.execute("INSERT INTO dim_time (scan_date, year, month, day, hour) VALUES ('2024-01-01', 2024, 1, 1, 10)")
     cursor.execute("INSERT INTO dim_engine (engine_name, vendor) VALUES ('Windows Defender', 'Microsoft')")
-    cursor.execute(
-        "INSERT INTO fact_malware_detections (family_id, device_id, time_id, engine_id, shannon_entropy, file_size_bytes) "
+    fact_sql = (
+        "INSERT INTO fact_malware_detections "
+        "(family_id, device_id, time_id, engine_id, shannon_entropy, file_size_bytes) "
         "VALUES (1, 'DEV-001', 1, 1, 6.72, 450000)"
     )
+    cursor.execute(fact_sql)
     conn.commit()
 
 

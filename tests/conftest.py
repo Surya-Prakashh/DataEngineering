@@ -8,7 +8,6 @@ making the test suite fully portable for CI runners.
 
 import hashlib
 import sqlite3
-import time
 from datetime import datetime
 
 import numpy as np

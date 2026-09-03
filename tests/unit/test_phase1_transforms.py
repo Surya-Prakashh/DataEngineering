@@ -13,7 +13,6 @@ Tests cover:
 
 import numpy as np
 import pandas as pd
-import pytest
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Helpers extracted from phase1.py logic (pure functions, no Flask required)

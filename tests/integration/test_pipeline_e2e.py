@@ -1,3 +1,4 @@
+
 """
 test_pipeline_e2e.py — Integration tests for the end-to-end MalwareScope pipeline.
 
@@ -7,9 +8,6 @@ They assert on response shape, status codes, and key field presence.
 Note: These tests require the full application stack and are run separately
 from unit tests in CI (job: integration-tests).
 """
-
-import json
-import pytest
 
 
 # ─────────────────────────────────────────────────────────────────────────────

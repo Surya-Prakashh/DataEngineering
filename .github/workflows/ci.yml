@@ -45,12 +45,8 @@ jobs:
 
       - name: Run flake8 (style & syntax check)
         run: |
-          flake8 . \
-            --max-line-length=120 \
-            --exclude=.git,__pycache__,venv,.venv,build,dist \
-            --extend-ignore=E203,W503 \
-            --count \
-            --statistics
+          # Settings (max-line-length, excludes, per-file-ignores) read from .flake8
+          flake8 .
 
       - name: Run black (formatting check)
         run: |
