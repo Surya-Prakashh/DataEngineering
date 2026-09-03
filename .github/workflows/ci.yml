@@ -1,6 +1,6 @@
 # ─────────────────────────────────────────────────────────────────────────────
 #  MalwareScope CI/CD — GitHub Actions Workflow
-#  Triggers: push to main/develop, pull_request to main
+#  Triggers: push to main/develop, pull_request to main/develop
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: "MalwareScope CI Pipeline"
@@ -36,6 +36,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
+          cache-dependency-path: "requirements-dev.txt"
 
       - name: Install lint dependencies
         run: |
@@ -55,7 +56,7 @@ jobs:
         run: |
           black --check --diff \
             --line-length 120 \
-            --exclude '/(\.git|__pycache__|venv|\.venv)/' \
+            --exclude '/(\\.git|__pycache__|venv|\\.venv)/' \
             .
 
   # ────────────────────────────────────────────────────────────────────────────
@@ -78,6 +79,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
+          cache-dependency-path: "requirements-dev.txt"
 
       - name: Install dependencies
         run: |
@@ -86,6 +88,7 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
+          mkdir -p test-results
           pytest tests/unit/ \
             -v \
             --tb=short \
@@ -131,6 +134,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
+          cache-dependency-path: "requirements-dev.txt"
 
       - name: Install dependencies
         run: |
@@ -164,21 +168,19 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
+          cache-dependency-path: "requirements-dev.txt"
 
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Copy baseline dataset for integration tests
+      - name: Generate synthetic dataset for CI
         run: |
-          # Integration tests need the real CSV to boot the Flask app
-          if [ -f "train_processed.csv" ]; then
-            echo "Dataset found — proceeding"
-          else
-            echo "⚠️  train_processed.csv not found — generating synthetic stub"
-            python -c "
-          import pandas as pd, numpy as np, hashlib, os
+          # train_processed.csv is gitignored — generate a lightweight stub for CI
+          echo "⚙️  Generating synthetic train_processed.csv for integration tests..."
+          python -c "
+          import pandas as pd, numpy as np, hashlib
           rng = np.random.default_rng(42)
           families = ['Ramnit','Lollipop','Kelihos_ver3','Vundo','Tracur',
                       'Kelihos_ver1','Obfuscator.ACY','Gatak','Simda']
@@ -197,16 +199,17 @@ jobs:
                      'PCA2': round(float(rng.uniform(-5, 5)), 4),
                      'tSNE1': round(float(rng.uniform(-20, 20)), 4),
                      'tSNE2': round(float(rng.uniform(-20, 20)), 4)}
-              for h in ['00','01','ff','20','0a','7f']:
+              for h in ['00','01','ff','20','0a','7f','c0','80']:
                   row[h] = round(float(rng.uniform(0, 1000)), 2)
               rows.append(row)
           pd.DataFrame(rows).to_csv('train_processed.csv', index=False)
-          print('Synthetic dataset created with', len(rows), 'rows')
+          pd.DataFrame(rows).to_csv('active_dataset.csv', index=False)
+          print(f'Synthetic dataset created: {len(rows)} rows')
           "
-          fi
 
       - name: Run integration tests
         run: |
+          mkdir -p test-results
           pytest tests/integration/ \
             -v \
             --tb=short \
@@ -237,6 +240,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          # No pip cache needed — only pyyaml installed
 
       - name: Install PyYAML
         run: pip install pyyaml
@@ -256,9 +260,9 @@ jobs:
               try:
                   with open(f) as fh:
                       data = yaml.safe_load(fh)
-                  print(f'  ✅ {f}')
+                  print(f'  OK: {f}')
               except yaml.YAMLError as e:
-                  errors.append(f'  ❌ {f}: {e}')
+                  errors.append(f'  FAIL: {f}: {e}')
 
           if errors:
               print('\nConfig validation FAILED:')
@@ -308,7 +312,7 @@ jobs:
              [[ "${{ needs.quality-gate.result }}" != "success" ]] || \
              [[ "${{ needs.integration-tests.result }}" != "success" ]] || \
              [[ "${{ needs.config-validation.result }}" != "success" ]]; then
-            echo "❌ One or more CI jobs failed."
+            echo "One or more CI jobs failed."
             echo "  lint:               ${{ needs.lint.result }}"
             echo "  unit-tests:         ${{ needs.unit-tests.result }}"
             echo "  quality-gate:       ${{ needs.quality-gate.result }}"
@@ -316,4 +320,4 @@ jobs:
             echo "  config-validation:  ${{ needs.config-validation.result }}"
             exit 1
           fi
-          echo "🎉 All CI checks passed!"
+          echo "All CI checks passed!"
