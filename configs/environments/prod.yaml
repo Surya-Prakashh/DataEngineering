@@ -1,0 +1,22 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Environment: Production
+#  Overrides on top of pipeline_config.yaml for production deployments
+# ─────────────────────────────────────────────────────────────────────────────
+
+environment: "production"
+
+logging:
+  level: "WARNING"          # only warnings and errors in prod
+
+phase4:
+  kafka:
+    seed_event_count: 60
+    e2e_produce_count: 15
+  data_quality:
+    # Stricter DQ thresholds in production
+    entropy_min: 0.5        # ignore trivially low-entropy records
+    entropy_max: 8.0
+    file_size_min: 1024     # minimum 1 KB — ignore zero-byte artefacts
+
+mock_data:
+  default_row_count: 50

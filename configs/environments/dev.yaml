@@ -1,0 +1,21 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Environment: Development
+#  Overrides on top of pipeline_config.yaml for local development
+# ─────────────────────────────────────────────────────────────────────────────
+
+environment: "development"
+
+logging:
+  level: "DEBUG"
+
+phase4:
+  kafka:
+    seed_event_count: 10      # seed fewer events locally for speed
+    e2e_produce_count: 5
+
+phase1:
+  tsne:
+    n_iter: 250               # fewer iterations for faster local EDA
+
+mock_data:
+  default_row_count: 10       # smaller mock batches for quick tests

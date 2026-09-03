@@ -1,0 +1,149 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  MalwareScope — Pipeline as Code Configuration
+#  All tunable pipeline parameters declared here.
+#  Environment-specific overrides live in configs/environments/*.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+
+pipeline:
+  name: "MalwareScope Data Engineering Pipeline"
+  version: "1.0.0"
+  description: "End-to-end malware analysis pipeline: Ingest → ETL → Warehouse → Stream"
+
+# ── Data Paths ────────────────────────────────────────────────────────────────
+paths:
+  original_csv: "train_processed.csv"
+  active_csv: "active_dataset.csv"
+  oltp_db: "malwarescope_oltp_3nf.db"
+  olap_db: "malwarescope_olap_star.db"
+  staging_db: "malwarescope_staging.db"
+  mock_rdbms_db: "mock_rdbms.db"
+
+# ── Phase 1: Data Foundations & Feature Engineering ───────────────────────────
+phase1:
+  baseline_row_count: 1643
+  engineered_features:
+    - "Shannon_Entropy"
+    - "Null_Byte_Ratio"
+    - "ASCII_Byte_Ratio"
+    - "High_Byte_Ratio"
+    - "NOP_Ratio"
+  pca:
+    n_components: 2
+    random_state: 42
+  tsne:
+    n_components: 2
+    perplexity: 30
+    n_iter: 300
+    random_state: 42
+    max_rows: 3000          # cap to keep it performant
+  scaler: "StandardScaler"
+  malware_families:
+    - "Ramnit"
+    - "Lollipop"
+    - "Kelihos_ver3"
+    - "Vundo"
+    - "Tracur"
+    - "Kelihos_ver1"
+    - "Obfuscator.ACY"
+    - "Gatak"
+    - "Simda"
+
+# ── Phase 2: ETL & CDC Pipeline ───────────────────────────────────────────────
+phase2:
+  extraction:
+    rdbms_sample_limit: 500     # rows from mock RDBMS on init
+    engines:
+      - "Windows Defender"
+      - "Kaspersky Engine"
+  cdc:
+    lsn_start: 1001
+    lsn_count: 8
+    change_types:
+      - "INSERT"
+      - "UPDATE"
+      - "DELETE"
+  transformations:
+    log_transform_col: "BytFSize"
+    type_cast_int_cols:
+      - "Class"
+      - "BytFSize"
+      - "Total_Bytes"
+    type_cast_float_cols:
+      - "Shannon_Entropy"
+      - "Null_Byte_Ratio"
+      - "ASCII_Byte_Ratio"
+      - "High_Byte_Ratio"
+      - "NOP_Ratio"
+
+# ── Phase 3: OLTP 3NF & OLAP Star Schema ─────────────────────────────────────
+phase3:
+  oltp:
+    tables:
+      - "malware_families"
+      - "devices"
+      - "scan_logs"
+    device_count: 20
+    device_prefix: "DEV-WIN10"
+    os_version: "Windows 10 Pro 22H2"
+  olap:
+    fact_table: "fact_malware_detections"
+    dimension_tables:
+      - "dim_family"
+      - "dim_device"
+      - "dim_time"
+      - "dim_engine"
+    family_metadata:
+      - [1, "Ramnit",         "Trojan-Banker",          "HIGH"]
+      - [2, "Lollipop",       "Adware/PUP",             "MEDIUM"]
+      - [3, "Kelihos_ver3",   "Botnet/Spam",            "CRITICAL"]
+      - [4, "Vundo",          "Adware/Downloader",      "HIGH"]
+      - [5, "Simda",          "Backdoor",               "CRITICAL"]
+      - [6, "Tracur",         "Trojan-Dropper",         "HIGH"]
+      - [7, "Kelihos_ver1",   "Botnet/Spam",            "HIGH"]
+      - [8, "Obfuscator.ACY", "Ransomware/Obfuscated",  "CRITICAL"]
+      - [9, "Gatak",          "Trojan-Spy",             "HIGH"]
+
+# ── Phase 4: Kafka Stream & Data Quality ──────────────────────────────────────
+phase4:
+  kafka:
+    topics:
+      ingest: "malware-ingest-topic"
+      dlq: "malware-dlq-topic"
+    partitions: 3
+    consumer_groups:
+      - "staging-ingest-group"
+    seed_event_count: 60          # initial events seeded on broker init
+    e2e_produce_count: 15         # events produced per pipeline run
+  data_quality:
+    required_fields:
+      - "sample_hash"
+      - "family_id"
+      - "shannon_entropy"
+      - "file_size_bytes"
+    entropy_min: 0.0
+    entropy_max: 8.0
+    file_size_min: 1              # bytes; must be > 0
+  staging:
+    tables:
+      - "staging_malware_events"
+      - "dead_letter_queue"
+      - "dq_audit_log"
+    idempotency_key_fields:
+      - "sample_hash"
+      - "family_id"
+
+# ── Mock Data Generation ──────────────────────────────────────────────────────
+mock_data:
+  default_row_count: 50
+  file_size_range:
+    min: 150000
+    max: 12000000
+  entropy_range:
+    min: 5.2
+    max: 7.95
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+logging:
+  level: "INFO"            # overridden per environment
+  format: "[%(asctime)s] %(levelname)s — %(name)s: %(message)s"
+  date_format: "%H:%M:%S"

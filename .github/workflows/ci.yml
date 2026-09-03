@@ -1,0 +1,319 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  MalwareScope CI/CD — GitHub Actions Workflow
+#  Triggers: push to main/develop, pull_request to main
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: "MalwareScope CI Pipeline"
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+# Cancel in-flight runs for the same branch on new push
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  #  JOB 1: Lint & Format Check
+  # ────────────────────────────────────────────────────────────────────────────
+  lint:
+    name: "🔍 Lint & Format"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install lint dependencies
+        run: |
+          pip install --upgrade pip
+          pip install flake8 black
+
+      - name: Run flake8 (style & syntax check)
+        run: |
+          flake8 . \
+            --max-line-length=120 \
+            --exclude=.git,__pycache__,venv,.venv,build,dist \
+            --extend-ignore=E203,W503 \
+            --count \
+            --statistics
+
+      - name: Run black (formatting check)
+        run: |
+          black --check --diff \
+            --line-length 120 \
+            --exclude '/(\.git|__pycache__|venv|\.venv)/' \
+            .
+
+  # ────────────────────────────────────────────────────────────────────────────
+  #  JOB 2: Unit Tests with Coverage
+  # ────────────────────────────────────────────────────────────────────────────
+  unit-tests:
+    name: "🧪 Unit Tests"
+    runs-on: ubuntu-latest
+    needs: lint
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run unit tests with coverage
+        run: |
+          pytest tests/unit/ \
+            -v \
+            --tb=short \
+            --cov=. \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --junitxml=test-results/unit-results.xml
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-py${{ matrix.python-version }}
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 7
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results-py${{ matrix.python-version }}
+          path: test-results/unit-results.xml
+          retention-days: 7
+
+  # ────────────────────────────────────────────────────────────────────────────
+  #  JOB 3: Coverage Quality Gate
+  # ────────────────────────────────────────────────────────────────────────────
+  quality-gate:
+    name: "📊 Coverage Gate (≥70%)"
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run tests and enforce minimum coverage
+        run: |
+          pytest tests/unit/ \
+            --cov=. \
+            --cov-fail-under=70 \
+            --cov-report=term-missing \
+            -q
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+  # ────────────────────────────────────────────────────────────────────────────
+  #  JOB 4: Integration Tests (full pipeline)
+  # ────────────────────────────────────────────────────────────────────────────
+  integration-tests:
+    name: "🔗 Integration Tests"
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Copy baseline dataset for integration tests
+        run: |
+          # Integration tests need the real CSV to boot the Flask app
+          if [ -f "train_processed.csv" ]; then
+            echo "Dataset found — proceeding"
+          else
+            echo "⚠️  train_processed.csv not found — generating synthetic stub"
+            python -c "
+          import pandas as pd, numpy as np, hashlib, os
+          rng = np.random.default_rng(42)
+          families = ['Ramnit','Lollipop','Kelihos_ver3','Vundo','Tracur',
+                      'Kelihos_ver1','Obfuscator.ACY','Gatak','Simda']
+          rows = []
+          for i, fam in enumerate(families * 5):
+              uid = hashlib.sha256(f'{fam}_{i}'.encode()).hexdigest()[:20]
+              row = {'Id': uid, 'Class': (i % 9) + 1, 'Family_Name': fam,
+                     'BytFSize': int(rng.integers(150000, 5000000)),
+                     'Total_Bytes': int(rng.integers(150000, 5000000)),
+                     'Shannon_Entropy': round(float(rng.uniform(5.2, 7.95)), 6),
+                     'Null_Byte_Ratio': round(float(rng.uniform(0.01, 0.4)), 6),
+                     'ASCII_Byte_Ratio': round(float(rng.uniform(0.3, 0.8)), 6),
+                     'High_Byte_Ratio': round(float(rng.uniform(0.01, 0.3)), 6),
+                     'NOP_Ratio': round(float(rng.uniform(0.0001, 0.05)), 6),
+                     'PCA1': round(float(rng.uniform(-5, 5)), 4),
+                     'PCA2': round(float(rng.uniform(-5, 5)), 4),
+                     'tSNE1': round(float(rng.uniform(-20, 20)), 4),
+                     'tSNE2': round(float(rng.uniform(-20, 20)), 4)}
+              for h in ['00','01','ff','20','0a','7f']:
+                  row[h] = round(float(rng.uniform(0, 1000)), 2)
+              rows.append(row)
+          pd.DataFrame(rows).to_csv('train_processed.csv', index=False)
+          print('Synthetic dataset created with', len(rows), 'rows')
+          "
+          fi
+
+      - name: Run integration tests
+        run: |
+          pytest tests/integration/ \
+            -v \
+            --tb=short \
+            --junitxml=test-results/integration-results.xml
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: test-results/integration-results.xml
+          retention-days: 7
+
+  # ────────────────────────────────────────────────────────────────────────────
+  #  JOB 5: Pipeline Config Validation
+  # ────────────────────────────────────────────────────────────────────────────
+  config-validation:
+    name: "⚙️ Config Validation"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Validate all YAML configs parse correctly
+        run: |
+          python -c "
+          import yaml, sys, pathlib
+
+          config_files = list(pathlib.Path('configs').rglob('*.yaml'))
+          if not config_files:
+              print('No config files found!')
+              sys.exit(1)
+
+          errors = []
+          for f in config_files:
+              try:
+                  with open(f) as fh:
+                      data = yaml.safe_load(fh)
+                  print(f'  ✅ {f}')
+              except yaml.YAMLError as e:
+                  errors.append(f'  ❌ {f}: {e}')
+
+          if errors:
+              print('\nConfig validation FAILED:')
+              for e in errors:
+                  print(e)
+              sys.exit(1)
+
+          print(f'\nAll {len(config_files)} config files are valid YAML.')
+          "
+
+      - name: Validate pipeline_config.yaml has required keys
+        run: |
+          python -c "
+          import yaml, sys
+
+          with open('configs/pipeline_config.yaml') as f:
+              cfg = yaml.safe_load(f)
+
+          required_top_keys = ['pipeline', 'paths', 'phase1', 'phase2', 'phase3', 'phase4']
+          missing = [k for k in required_top_keys if k not in cfg]
+          if missing:
+              print(f'Missing required top-level keys: {missing}')
+              sys.exit(1)
+
+          print('pipeline_config.yaml structure validated successfully.')
+          "
+
+  # ────────────────────────────────────────────────────────────────────────────
+  #  JOB 6: CI Summary (all jobs must pass)
+  # ────────────────────────────────────────────────────────────────────────────
+  ci-summary:
+    name: "✅ CI Complete"
+    runs-on: ubuntu-latest
+    needs:
+      - lint
+      - unit-tests
+      - quality-gate
+      - integration-tests
+      - config-validation
+    if: always()
+
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [[ "${{ needs.lint.result }}" != "success" ]] || \
+             [[ "${{ needs.unit-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.quality-gate.result }}" != "success" ]] || \
+             [[ "${{ needs.integration-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.config-validation.result }}" != "success" ]]; then
+            echo "❌ One or more CI jobs failed."
+            echo "  lint:               ${{ needs.lint.result }}"
+            echo "  unit-tests:         ${{ needs.unit-tests.result }}"
+            echo "  quality-gate:       ${{ needs.quality-gate.result }}"
+            echo "  integration-tests:  ${{ needs.integration-tests.result }}"
+            echo "  config-validation:  ${{ needs.config-validation.result }}"
+            exit 1
+          fi
+          echo "🎉 All CI checks passed!"

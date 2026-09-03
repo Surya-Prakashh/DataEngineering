@@ -1,0 +1,86 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  MalwareScope Data Engineering — .gitignore
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Large Data Files ──────────────────────────────────────────────────────────
+*.csv
+*.parquet
+*.pkl
+*.feather
+*.h5
+*.hdf5
+*.arrow
+
+# ── SQLite Databases (generated at runtime) ───────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-link
+*.manifest
+
+# ── Virtual Environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.conda/
+
+# ── Testing & Coverage ────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+nosetests.xml
+test-results/
+
+# ── Jupyter Notebooks ─────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── IDE & Editor ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Environment & Secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+*.env
+secrets.yaml
+secrets.yml
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── OS artifacts ──────────────────────────────────────────────────────────────
+.DS_Store
+desktop.ini

@@ -1,0 +1,26 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Environment: Staging
+#  Overrides on top of pipeline_config.yaml for QA / pre-production
+# ─────────────────────────────────────────────────────────────────────────────
+
+environment: "staging"
+
+logging:
+  level: "INFO"
+
+paths:
+  oltp_db: "staging_malwarescope_oltp_3nf.db"
+  olap_db: "staging_malwarescope_olap_star.db"
+  staging_db: "staging_malwarescope_staging.db"
+
+phase4:
+  kafka:
+    seed_event_count: 30
+    e2e_produce_count: 10
+  data_quality:
+    entropy_min: 0.0
+    entropy_max: 8.0
+    file_size_min: 1
+
+mock_data:
+  default_row_count: 25
