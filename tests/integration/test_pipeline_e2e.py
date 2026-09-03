@@ -115,9 +115,9 @@ class TestPhase4KafkaEndpoints:
         assert "partitions" in data or "partition_metrics" in data or "topics" in data, \
             f"Kafka status missing partition info. Keys: {list(data.keys())}"
 
-    def test_dq_dashboard_200(self, flask_test_client):
-        """Phase 4 DQ dashboard endpoint must return 200."""
-        response = flask_test_client.get("/api/phase4/dq_dashboard")
+    def test_phase4_report_200(self, flask_test_client):
+        """Phase 4 report endpoint must return 200."""
+        response = flask_test_client.get("/api/phase4/report")
         assert response.status_code == 200
 
 
